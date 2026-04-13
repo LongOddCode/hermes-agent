@@ -92,6 +92,7 @@ _DEFAULT_PROVIDER_MODELS = {
         "gpt-4.1",
         "gpt-4o",
         "gpt-4o-mini",
+        "claude-opus-4.6-1m",
         "claude-opus-4.6",
         "claude-sonnet-4.6",
         "claude-sonnet-4.5",

@@ -102,6 +102,7 @@ DEFAULT_CONTEXT_LENGTHS = {
     "claude-opus-4-6": 1000000,
     "claude-sonnet-4-6": 1000000,
     "claude-opus-4.6": 1000000,
+    "claude-opus-4.6-1m": 1000000,
     "claude-sonnet-4.6": 1000000,
     # Catch-all for older Claude models (must sort after specific entries)
     "claude": 200000,
@@ -167,6 +168,7 @@ _CONTEXT_LENGTH_KEYS = (
     "context_length",
     "context_window",
     "max_context_length",
+    "max_context_window_tokens",
     "max_position_embeddings",
     "max_model_len",
     "max_input_tokens",
@@ -951,11 +953,17 @@ def get_model_context_length(
             return cached
 
     # 2. Active endpoint metadata for truly custom/unknown endpoints.
-    # Known providers (Copilot, OpenAI, Anthropic, etc.) skip this — their
-    # /models endpoint may report a provider-imposed limit (e.g. Copilot
-    # returns 128k) instead of the model's full context (400k).  models.dev
-    # has the correct per-provider values and is checked at step 5+.
-    if _is_custom_endpoint(base_url) and not _is_known_provider_base_url(base_url):
+    # Most known providers (OpenAI, Anthropic, etc.) skip this — their
+    # /models endpoint may report a provider-imposed limit instead of the
+    # model's full context.  Copilot is an exception: its /models response
+    # includes accurate per-model context windows (max_context_window_tokens).
+    _copilot_trusted = (
+        provider in ("copilot", "copilot-acp")
+        or (base_url and "githubcopilot.com" in base_url)
+    )
+    if _copilot_trusted or (
+        _is_custom_endpoint(base_url) and not _is_known_provider_base_url(base_url)
+    ):
         endpoint_metadata = fetch_endpoint_model_metadata(base_url, api_key=api_key)
         matched = endpoint_metadata.get(model)
         if not matched:
@@ -972,7 +980,7 @@ def get_model_context_length(
             context_length = matched.get("context_length")
             if isinstance(context_length, int):
                 return context_length
-        if not _is_known_provider_base_url(base_url):
+        if not _is_known_provider_base_url(base_url) and not _copilot_trusted:
             # 3. Try querying local server directly
             if is_local_endpoint(base_url):
                 local_ctx = _query_local_context_length(model, base_url)
